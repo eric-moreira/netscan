@@ -1,0 +1,100 @@
+#include <string.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/select.h>
+#include <netdb.h>
+#include <stdlib.h>
+#include <sys/epoll.h>
+
+#define MAX_EVENTS 64
+
+void usage(char* prog_name){
+        printf("Usage: %s -h <host> -p <port>\n", prog_name);
+}
+
+int main(int argc, char* argv[])
+{
+
+        char *HOST = NULL;
+        int PORT = -1;
+        int opt, nrevents;
+        int sock = socket(AF_INET, SOCK_STREAM, 0);
+        fcntl(sock, F_SETFL, O_NONBLOCK);
+	struct addrinfo hints, *result;
+        int epoll_fd = epoll_create1 (0); 
+        
+        if(epoll_fd < 0){
+                perror("epoll_create1");
+                return -1;
+        }
+        struct epoll_event event;
+        event.events = EPOLLOUT;
+        event.data.fd = sock;
+
+        if(epoll_ctl(epoll_fd, EPOLL_CTL_ADD, sock, &event)){
+                perror("epoll_ctl");
+                return -1;
+        }
+
+        while ((opt = getopt(argc, argv, "h:p:")) != -1 ){
+                switch (opt){
+                case 'h':
+                        HOST = optarg;
+                        break;
+                case 'p':
+                        PORT = atoi(optarg);
+                        break;
+                case '?':
+                        usage(argv[0]);
+                        return 1;
+                }
+                
+        }
+
+        if (HOST == NULL || PORT == -1) {
+    usage(argv[0]);
+    return 1;
+}
+
+if (PORT <= 0 || PORT > 65535) {
+    printf("Invalid port: %d\n", PORT);
+    return 1;
+}
+	
+	memset(&hints, 0, sizeof(hints));
+
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_STREAM;
+
+	if (getaddrinfo(HOST, NULL, &hints, &result) != 0) {
+		fprintf(stderr, "getaddrinfo() failed\n");
+                return -1;
+	}
+
+	struct sockaddr_in *addr_in = (struct sockaddr_in *)result->ai_addr;
+
+	printf("IP: %s \n", inet_ntoa(addr_in->sin_addr));
+
+	addr_in->sin_port = htons(PORT);	// LEndian 0x0050 p/ BEndian 0x5000
+        
+	connect(sock, (struct sockaddr *)addr_in, sizeof(addr_in));
+
+        struct epoll_event events[1];
+        nrevents = epoll_wait(epoll_fd, events, 1, 3000);
+
+        if(nrevents <=0){
+                printf("%d : closed", PORT);
+        } else {
+                printf("%d : open", PORT);
+        }
+	
+	freeaddrinfo(result);
+
+	close(sock);
+        close(epoll_fd);
+	return 0;
+}
