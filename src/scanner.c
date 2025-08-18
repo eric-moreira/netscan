@@ -14,7 +14,11 @@
 #include "../include/scanner.h"
 
 int scan_port(char *host, int port, int seconds)
-{
+{	
+	if(port < 0 || port > 65535){
+		printf("Invalid port \n");
+		return -1;
+	}
 	int sock = socket(AF_INET, SOCK_STREAM, 0);
 	fcntl(sock, F_SETFL, O_NONBLOCK);
 	struct addrinfo hints, *result;
@@ -30,8 +34,6 @@ int scan_port(char *host, int port, int seconds)
 	}
 
 	struct sockaddr_in *addr_in = (struct sockaddr_in *)result->ai_addr;
-
-	printf("IP: %s \n", inet_ntoa(addr_in->sin_addr));
 
 	addr_in->sin_port = htons(port);	// LEndian 0x0050 p/ BEndian 0x5000
 
@@ -78,4 +80,65 @@ int scan_port(char *host, int port, int seconds)
 	close(sock);
 	return 0;
 
+}
+
+
+int* parse_single_port(char* str, int*  count){
+    int port = atoi(str);
+    if(port <= 0 || port > 65535) return NULL;
+
+    int* ports = malloc(sizeof(int));
+    ports[0] = port;
+    *count = 1;
+    return ports;
+}
+
+int* parse_port_range(char* str, int* count){
+    char strstart[64];
+	strcpy(strstart, str);
+	char* dash = strchr(strstart, '-');
+	*dash = '\0';
+	int start = atoi(strstart);
+	int end = atoi(dash+1);
+	if(start < 0 || end > 65535 || start > end) return NULL;
+	*count = end - start + 1;
+	int *ports = malloc(*count * sizeof(int));
+	for (int i =0; i< *count; i++){
+		ports[i] = start + i;
+	}
+	return ports;
+}
+
+int* parse_port_list(char* str, int* count){
+	char buffer[1024];
+	strncpy(buffer, str, sizeof(buffer)-1);
+	buffer[sizeof(buffer)-1] = '\0';
+	
+	int *all_ports = NULL;
+	int total_count = 0;
+	
+	char *token = strtok(buffer, ",");
+	while (token){
+		int *current_ports;
+		int current_count;
+
+		if(strchr(token, '-')){
+			current_ports = parse_port_range(token, &current_count);
+		} else {
+			current_ports = parse_single_port(token, &current_count);
+		}
+
+		if(current_ports) {
+			all_ports = realloc(all_ports, (total_count + current_count) * sizeof(int));
+			for(int i =0; i < current_count; i++){
+				all_ports[total_count + i] = current_ports[i];
+			}
+			total_count += current_count;
+			free(current_ports);
+		}
+
+		token = strtok(NULL, ",");
+	}
+	*count = total_count;
+	return all_ports;
 }

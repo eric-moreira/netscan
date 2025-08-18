@@ -46,6 +46,7 @@ TEST(scan_open_port) {
     assert(server_fd > 0);
     
     // Test scanning the open port
+    printf("target: 127.0.0.1\n");
     int result = scan_port("127.0.0.1", 12345, 2);
     assert(result == 0); // Should complete successfully
     
@@ -55,18 +56,21 @@ TEST(scan_open_port) {
 TEST(scan_closed_port) {
     // Test scanning a port that should be closed
     // Using port 12346 which we don't bind to
+    printf("target: 127.0.0.1\n");
     int result = scan_port("127.0.0.1", 12346, 1);
     assert(result == 0); // Should complete (but show closed)
 }
 
 TEST(scan_with_hostname) {
     // Test hostname resolution
+    printf("target: localhost\n");
     int result = scan_port("localhost", 22, 2);
     assert(result == 0); // Should resolve and complete
 }
 
 TEST(scan_invalid_hostname) {
     // Test with invalid hostname
+    printf("target: invalid.hostname.that.does.not.exist\n");
     int result = scan_port("invalid.hostname.that.does.not.exist", 80, 1);
     assert(result == -1); // Should fail with getaddrinfo error
 }
@@ -74,19 +78,26 @@ TEST(scan_invalid_hostname) {
 TEST(scan_invalid_port_range) {
     // Note: This tests the main() logic, but we'll test edge cases
     // For now, test valid port ranges that our function handles
+    printf("target: 127.0.0.1\n");
     int result = scan_port("127.0.0.1", 1, 1);
     assert(result == 0); // Port 1 is valid
     
+    printf("target: 127.0.0.1\n");
     result = scan_port("127.0.0.1", 65535, 1);
     assert(result == 0); // Port 65535 is valid
+    printf("target: 127.0.0.1 port: -12\n");
+    result = scan_port("127.0.0.1", -12, 1);
+    assert(result == -1);
 }
 
 TEST(scan_timeout_functionality) {
     // Test that timeout parameter is respected
     // This is harder to test precisely, but we can verify it doesn't crash
+    printf("target: 127.0.0.1\n");
     int result = scan_port("127.0.0.1", 12347, 1); // 1 second timeout
     assert(result == 0);
     
+    printf("target: 127.0.0.1\n");
     result = scan_port("127.0.0.1", 12348, 5); // 5 second timeout
     assert(result == 0);
 }
@@ -96,10 +107,12 @@ TEST(scan_well_known_services) {
     // These are non-intrusive tests
     
     // Test Google DNS (should be reachable)
+    printf("target: 8.8.8.8\n");
     int result = scan_port("8.8.8.8", 53, 3);
     assert(result == 0); // Should complete
     
     // Test Google web server
+    printf("target: google.com\n");
     result = scan_port("google.com", 80, 3);
     assert(result == 0); // Should complete
 }

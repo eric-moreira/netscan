@@ -22,8 +22,9 @@ int main(int argc, char *argv[])
 {
 
 	char *HOST = NULL;
-	int PORT = -1;
+	int *PORTS;
         int TIMEOUT = -1;
+        int count = 0;
 	int opt;
 	
 	while ((opt = getopt(argc, argv, "h:p:t:")) != -1) {
@@ -32,7 +33,7 @@ int main(int argc, char *argv[])
 			HOST = optarg;
 			break;
 		case 'p':
-			PORT = atoi(optarg);
+			PORTS = parse_port_list(optarg, &count);
 			break;
                 case 't':
                         TIMEOUT = atoi(optarg);
@@ -44,17 +45,15 @@ int main(int argc, char *argv[])
 
 	}
 
-	if (HOST == NULL || PORT == -1) {
+	if (HOST == NULL || PORTS == NULL) {
 		usage(argv[0]);
 		return 1;
 	}
 
-	if (PORT <= 0 || PORT > 65535) {
-		printf("Invalid port: %d\n", PORT);
-		return 1;
-	}
 
-        scan_port(HOST, PORT, TIMEOUT);
-	
+        printf("TARGET: %s\n", HOST);
+        for(int i=0; i < count; i++){
+                scan_port(HOST, PORTS[i], TIMEOUT);
+        }
 	return 0;
 }

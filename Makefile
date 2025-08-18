@@ -49,4 +49,9 @@ memcheck-test: $(TEST_TARGET)
 clean:
 	rm -f $(TARGET) $(TEST_TARGET)
 
+fast:$(TARGET)
+
+$(TARGET): $(SOURCES)
+	$(CC) -o $@ $^
+
 .PHONY: all debug test debug-test lint format memcheck memcheck-test clean
