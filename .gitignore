@@ -1,3 +1,4 @@
 netscan
+test_runner
 *.o
 *.dSYM/
