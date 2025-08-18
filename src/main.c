@@ -1,5 +1,4 @@
-#include <asm-generic/socket.h>
-#include <bits/types/struct_timeval.h>
+#define _GNU_SOURCE
 #include <stddef.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -11,17 +10,16 @@
 #include <sys/select.h>
 #include <netdb.h>
 #include <stdlib.h>
-#include <sys/epoll.h>
 #include <errno.h>
 
 #define MAX_EVENTS 64
 
-void usage(char *prog_name)
+static void usage(char const *prog_name)
 {
 	printf("Usage: %s -h <host> -p <port>\n", prog_name);
 }
 
-int scan_port(char *host, int port, int seconds){
+static int scan_port(char *host, int port, int seconds){
         int sock = socket(AF_INET, SOCK_STREAM, 0);
 	fcntl(sock, F_SETFL, O_NONBLOCK);
 	struct addrinfo hints, *result;
@@ -42,7 +40,7 @@ int scan_port(char *host, int port, int seconds){
 
 	addr_in->sin_port = htons(port);	// LEndian 0x0050 p/ BEndian 0x5000
 
-	int res = connect(sock, (struct sockaddr*)addr_in, sizeof(*addr_in));
+	connect(sock, (struct sockaddr*)addr_in, sizeof(*addr_in));
         if (errno != EINPROGRESS){
                 fprintf(stderr, "error in connect() %d\n", errno);
         }
