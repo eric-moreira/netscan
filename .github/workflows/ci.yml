@@ -1,0 +1,29 @@
+name: CI
+on: [push, pull_request]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install dependencies
+      run: sudo apt-get update && sudo apt-get install -y build-essential cppcheck valgrind
+    
+    - name: Build main binary
+      run: make
+        
+    - name: Build tests
+      run: make test_runner
+      
+    - name: Run unit tests
+      run: make test
+      
+    - name: Static Analysis (cppcheck)
+      run: make lint
+      
+    - name: Memory check on tests
+      run: make memcheck-test
+      
+    - name: Test basic functionality
+      run: timeout 10s ./netscan -h 127.0.0.1 -p 22 -t 2 || true
