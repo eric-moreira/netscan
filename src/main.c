@@ -120,10 +120,6 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-        if (TIMEOUT != -1){
-
-        }
-
         scan_port(HOST, PORT, TIMEOUT);
 	
 	return 0;
