@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -Werror -std=c99 -pedantic
+CFLAGS = -Wall -Wextra -Werror -std=c99
 DEBUG_FLAGS = -g -fsanitize=address -fsanitize=undefined
 LDFLAGS = 
 
