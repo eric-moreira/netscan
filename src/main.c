@@ -40,9 +40,11 @@ static int scan_port(char *host, int port, int seconds){
 
 	addr_in->sin_port = htons(port);	// LEndian 0x0050 p/ BEndian 0x5000
 
-	connect(sock, (struct sockaddr*)addr_in, sizeof(*addr_in));
-        if (errno != EINPROGRESS){
+        int res = connect(sock, (struct sockaddr*)addr_in, sizeof(*addr_in));
+
+        if (res == -1 && errno != EINPROGRESS){
                 fprintf(stderr, "error in connect() %d\n", errno);
+                return -1;
         }
 
         fd_set socket_fds;
