@@ -1,7 +1,7 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -Werror -std=c99
 DEBUG_FLAGS = -g -fsanitize=address -fsanitize=undefined
-LDFLAGS = 
+LDFLAGS = -lpthread
 
 SRCDIR = src
 TESTDIR = tests
@@ -17,11 +17,11 @@ LIB_SOURCES = $(filter-out $(SRCDIR)/main.c, $(SOURCES))
 all: $(TARGET)
 
 $(TARGET): $(SOURCES)
-	$(CC) $(CFLAGS) -O2 -o $@ $^
+	$(CC) $(CFLAGS) -O2 -o $@ $^ $(LDFLAGS)
 
 # Build test runner
 $(TEST_TARGET): $(TEST_SOURCES) $(LIB_SOURCES)
-	$(CC) $(CFLAGS) -I$(INCLUDEDIR) -o $@ $^
+	$(CC) $(CFLAGS) -I$(INCLUDEDIR) -o $@ $^ $(LDFLAGS)
 
 # Run tests
 test: $(TEST_TARGET)
@@ -48,10 +48,5 @@ memcheck-test: $(TEST_TARGET)
 
 clean:
 	rm -f $(TARGET) $(TEST_TARGET)
-
-fast:$(TARGET)
-
-$(TARGET): $(SOURCES)
-	$(CC) -o $@ $^
 
 .PHONY: all debug test debug-test lint format memcheck memcheck-test clean

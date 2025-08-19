@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 #include <stddef.h>
 #include <string.h>
+#include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -57,7 +58,7 @@ int scan_port(char *host, int port, int seconds)
 	}
 
 	int num_ready_sockets =
-	    select(sock + 1, NULL, &socket_fds, NULL, &timeout);
+		select(sock + 1, NULL, &socket_fds, NULL, &timeout);
 
 	if (num_ready_sockets <= 0) {
 		printf("%d : closed  (error: timeout)\n", port);
@@ -71,7 +72,7 @@ int scan_port(char *host, int port, int seconds)
 			printf("%d : open\n", port);
 		} else {
 			printf("%d : closed  (error: %s)\n", port,
-			       strerror(error));
+				   strerror(error));
 		}
 	}
 
@@ -84,17 +85,17 @@ int scan_port(char *host, int port, int seconds)
 
 
 int* parse_single_port(char* str, int*  count){
-    int port = atoi(str);
-    if(port <= 0 || port > 65535) return NULL;
+	int port = atoi(str);
+	if(port <= 0 || port > 65535) return NULL;
 
-    int* ports = malloc(sizeof(int));
-    ports[0] = port;
-    *count = 1;
-    return ports;
+	int* ports = malloc(sizeof(int));
+	ports[0] = port;
+	*count = 1;
+	return ports;
 }
 
 int* parse_port_range(char* str, int* count){
-    char strstart[64];
+	char strstart[64];
 	strcpy(strstart, str);
 	char* dash = strchr(strstart, '-');
 	*dash = '\0';
@@ -141,4 +142,24 @@ int* parse_port_list(char* str, int* count){
 	}
 	*count = total_count;
 	return all_ports;
+}
+
+int resolve_hostname(const char* hostname, char* ip_buffer){
+	struct addrinfo hints, *result;
+	memset(&hints, 0, sizeof(hints));
+
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_STREAM;
+
+	if(getaddrinfo(hostname, NULL, &hints, &result) != 0){
+		fprintf(stderr, "Could not resolve host: %s", hostname);
+		return -1;
+	}
+
+	struct sockaddr_in *addr_in = (struct sockaddr_in*)result->ai_addr;
+
+	inet_ntop(AF_INET, &(addr_in->sin_addr), ip_buffer, INET_ADDRSTRLEN);
+
+	freeaddrinfo(result);
+	return 0;
 }

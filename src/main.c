@@ -22,11 +22,10 @@ int main(int argc, char *argv[])
 {
 
 	char *HOST = NULL;
-	int *PORTS;
-        int TIMEOUT = -1;
-        int count = 0;
+	int *PORTS = NULL;
+	int TIMEOUT = -1;
+	int count = 0;
 	int opt;
-	
 	while ((opt = getopt(argc, argv, "h:p:t:")) != -1) {
 		switch (opt) {
 		case 'h':
@@ -50,10 +49,13 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	char IP[INET_ADDRSTRLEN];
+	if(resolve_hostname(HOST, IP) != 0){
+		return -1;
+	}
+	
+	if(TIMEOUT != 0)
+		printf("HOST: %s (%s)\n", HOST, IP);
 
-        printf("TARGET: %s\n", HOST);
-        for(int i=0; i < count; i++){
-                scan_port(HOST, PORTS[i], TIMEOUT);
-        }
 	return 0;
 }
