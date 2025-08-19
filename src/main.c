@@ -54,8 +54,9 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 	
-	if(TIMEOUT != 0)
-		printf("HOST: %s (%s)\n", HOST, IP);
+	printf("HOST: %s (%s)\n", HOST, IP);
+	
+	
 
 	return 0;
 }

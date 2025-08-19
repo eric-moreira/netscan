@@ -12,7 +12,12 @@
 #include <netdb.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <pthread.h>
 #include "../include/scanner.h"
+
+#define true 1
+#define false 0
+
 
 int scan_port(char *host, int port, int seconds)
 {	
@@ -163,3 +168,42 @@ int resolve_hostname(const char* hostname, char* ip_buffer){
 	freeaddrinfo(result);
 	return 0;
 }
+
+int threaded_scan_ports(scan_config_t *config, scan_result_t **results){
+	return 0;
+}
+
+void* worker_thread(work_queue_t *work_queue){
+	while(true){
+		work_item_t item;
+		if(get_next_port(work_queue, &item) == -1){
+			break;
+		}
+		int status = scan_port(work_queue->config->host, item.port, work_queue->config->timeout);
+
+		save_result(work_queue, &item, status);
+	}
+
+}
+
+int get_next_port(work_queue_t *work_queue, work_item_t *item){
+	pthread_mutex_lock(&work_queue->mutex);
+
+	if (work_queue->current_index >= work_queue->total_ports){
+		pthread_mutex_unlock(&work_queue->mutex);
+		return -1;
+	}
+
+	item->port = work_queue->ports[work_queue->current_index];
+	item->index = work_queue->current_index;
+	work_queue->current_index++;
+
+	pthread_mutex_unlock(&work_queue->mutex);
+	return 0;
+}
+
+void save_result(work_queue_t *work_queue, work_item_t *item, int status){
+	work_queue->results[item->index].port = item->port;
+	work_queue->results[item->index].status = status;	
+}
+

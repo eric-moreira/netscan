@@ -8,6 +8,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+
 typedef struct {
     char *host;
     int *ports;
@@ -31,6 +32,11 @@ typedef struct {
     scan_result_t *results;
 } work_queue_t;
 
+typedef struct {
+    int port;
+    int index;
+} work_item_t;
+
 int scan_port(char *host, int port, int seconds);
 int* parse_single_port(char* str, int* count);
 int* parse_port_range(char* str, int* count);
@@ -39,7 +45,9 @@ int resolve_hostname(const char* hostname, char* ip_buffer);
 
 int threaded_scan_ports(scan_config_t *config, scan_result_t **results);
 
-void* worker_thread(void* arg);
+void* worker_thread(work_queue_t* work_queue);
+int get_next_port(work_queue_t *work_queue, work_item_t *item);
+void save_result(work_queue_t *work_queue, work_item_t *item, int status);
 
 
 
