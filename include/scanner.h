@@ -24,8 +24,6 @@ typedef struct {
 } scan_result_t;
 
 typedef struct {
-    int *ports;
-    int total_ports;
     int current_index;
     pthread_mutex_t mutex;
     scan_config_t *config;
@@ -37,6 +35,11 @@ typedef struct {
     int index;
 } work_item_t;
 
+enum ports {
+    PORT_CLOSED = 0,
+    PORT_OPEN = 1,
+};
+
 int scan_port(char *host, int port, int seconds);
 int* parse_single_port(char* str, int* count);
 int* parse_port_range(char* str, int* count);
@@ -45,9 +48,9 @@ int resolve_hostname(const char* hostname, char* ip_buffer);
 
 int threaded_scan_ports(scan_config_t *config, scan_result_t **results);
 
-void* worker_thread(work_queue_t* work_queue);
+void* worker_thread(void* work_queue);
 int get_next_port(work_queue_t *work_queue, work_item_t *item);
-void save_result(work_queue_t *work_queue, work_item_t *item, int status);
+void save_result(work_queue_t *work_queue, work_item_t *item , int status);
 
 
 

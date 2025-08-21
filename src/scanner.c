@@ -21,10 +21,11 @@
 
 int scan_port(char *host, int port, int seconds)
 {	
-	if(port < 0 || port > 65535){
-		printf("Invalid port \n");
-		return -1;
-	}
+    // Port 0 is reserved and invalid for scanning
+    if(port <= 0 || port > 65535){
+        printf("Invalid port \n");
+        return -1;
+    }
 	int sock = socket(AF_INET, SOCK_STREAM, 0);
 	fcntl(sock, F_SETFL, O_NONBLOCK);
 	struct addrinfo hints, *result;
@@ -66,26 +67,27 @@ int scan_port(char *host, int port, int seconds)
 		select(sock + 1, NULL, &socket_fds, NULL, &timeout);
 
 	if (num_ready_sockets <= 0) {
-		printf("%d : closed  (error: timeout)\n", port);
-		return 0;
+		return PORT_CLOSED;  // Timeout or error - port is closed
 	}
+
 	int error = 0;
 	socklen_t len = sizeof(error);
 
 	if (getsockopt(sock, SOL_SOCKET, SO_ERROR, &error, &len) == 0) {
 		if (error == 0) {
-			printf("%d : open\n", port);
+			freeaddrinfo(result);
+			close(sock);
+			return PORT_OPEN;  // Port is open
 		} else {
-			printf("%d : closed  (error: %s)\n", port,
-				   strerror(error));
+			freeaddrinfo(result);
+			close(sock);
+			return PORT_CLOSED;  // Port is closed
 		}
 	}
 
 	freeaddrinfo(result);
-
 	close(sock);
-	return 0;
-
+	return PORT_CLOSED;  // Default to closed if we can't determine
 }
 
 
@@ -169,12 +171,62 @@ int resolve_hostname(const char* hostname, char* ip_buffer){
 	return 0;
 }
 
-int threaded_scan_ports(scan_config_t *config, scan_result_t **results){
-	return 0;
+int threaded_scan_ports(scan_config_t *config, scan_result_t **results) {
+    if(!config || !results || config->thread_count <= 0 || !config->ports) {
+        return -1;
+    }
+
+    work_queue_t *work_queue = malloc(sizeof(work_queue_t));
+    if(!work_queue) {
+        return -1;
+    }
+
+    *results = malloc(config->port_count * sizeof(scan_result_t));
+    if(!*results) {
+        free(work_queue);
+        return -1;
+    }
+
+    work_queue->config = config;
+    work_queue->results = *results;
+    work_queue->current_index = 0;
+
+    if(pthread_mutex_init(&work_queue->mutex, NULL) != 0) {
+        free(*results);
+        free(work_queue);
+        return -1;
+    }
+
+    pthread_t threads[config->thread_count];
+    int threads_created = 0;
+
+    for(int i = 0; i < config->thread_count; i++) {
+        if(pthread_create(&threads[i], NULL, worker_thread, work_queue) != 0) {
+            break;
+        }
+        threads_created++;
+    }
+
+    if(threads_created == 0) {
+        pthread_mutex_destroy(&work_queue->mutex);
+        free(*results);
+        free(work_queue);
+        return -1;
+    }
+
+    for(int i = 0; i < threads_created; i++) {
+        pthread_join(threads[i], NULL);
+    }
+
+    pthread_mutex_destroy(&work_queue->mutex);
+    free(work_queue);
+
+    return 0;
 }
 
-void* worker_thread(work_queue_t *work_queue){
-	while(true){
+void* worker_thread(void *arg){
+	work_queue_t *work_queue = (work_queue_t*) arg;
+ 	while(true){
 		work_item_t item;
 		if(get_next_port(work_queue, &item) == -1){
 			break;
@@ -183,18 +235,18 @@ void* worker_thread(work_queue_t *work_queue){
 
 		save_result(work_queue, &item, status);
 	}
-
+	return NULL;
 }
 
 int get_next_port(work_queue_t *work_queue, work_item_t *item){
 	pthread_mutex_lock(&work_queue->mutex);
 
-	if (work_queue->current_index >= work_queue->total_ports){
+	if (work_queue->current_index >= work_queue->config->port_count){
 		pthread_mutex_unlock(&work_queue->mutex);
 		return -1;
 	}
 
-	item->port = work_queue->ports[work_queue->current_index];
+	item->port = work_queue->config->ports[work_queue->current_index];
 	item->index = work_queue->current_index;
 	work_queue->current_index++;
 
