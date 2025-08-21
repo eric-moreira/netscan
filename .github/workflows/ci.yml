@@ -68,14 +68,16 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: rpm-package
-        path: ~/rpmbuild/RPMS/x86_64/*.rpm
+        path: ${{ github.workspace }}/rpmbuild/RPMS/x86_64/*.rpm
+        if-no-files-found: warn
         
     - name: Upload DEB
       if: matrix.type == 'deb'
       uses: actions/upload-artifact@v4
       with:
         name: deb-package
-        path: ../*.deb
+        path: ${{ github.workspace }}/*.deb
+        if-no-files-found: warn
 
   release:
     needs: build-packages
