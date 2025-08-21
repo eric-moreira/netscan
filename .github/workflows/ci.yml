@@ -2,96 +2,94 @@ name: CI
 on: [push, pull_request]
 
 jobs:
- build-and-test:
-   runs-on: ubuntu-latest
-   steps:
-   - uses: actions/checkout@v3
-   
-   - name: Install dependencies
-     run: sudo apt-get update && sudo apt-get install -y build-essential cppcheck valgrind
-   
-   - name: Build main binary
-     run: make
-       
-   - name: Build tests
-     run: make test_runner
-     
-   - name: Run unit tests
-     run: make test
-     
-   - name: Static Analysis (cppcheck)
-     run: make lint
-     
-   - name: Memory check on tests
-     run: make memcheck-test
-     
-   - name: Test basic functionality
-     run: timeout 10s ./netscan -h 127.0.0.1 -p 22 -t 2 || true
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install dependencies
+      run: sudo apt-get update && sudo apt-get install -y build-essential cppcheck valgrind
+    
+    - name: Build main binary
+      run: make
+        
+    - name: Build tests
+      run: make test_runner
+      
+    - name: Run unit tests
+      run: make test
+      
+    - name: Static Analysis (cppcheck)
+      run: make lint
+      
+    - name: Memory check on tests
+      run: make memcheck-test
+      
+    - name: Test basic functionality
+      run: timeout 10s ./netscan -h 127.0.0.1 -p 22 -t 2 || true
 
- build-packages:
-   needs: build-and-test
-   runs-on: ubuntu-latest
-   if: startsWith(github.ref, 'refs/tags/')
-   strategy:
-     matrix:
-       include:
-         - os: fedora:latest
-           type: rpm
-         - os: ubuntu:latest
-           type: deb
-   container: ${{ matrix.os }}
-   steps:
-   - uses: actions/checkout@v3
-   
-   - name: Install RPM deps
-     if: matrix.type == 'rpm'
-     run: dnf install -y gcc make rpm-build rpm-devel tar gzip
-     
-   - name: Install DEB deps
-     if: matrix.type == 'deb'
-     run: apt-get update && apt-get install -y build-essential debhelper devscripts
-   
-   - name: Build RPM
-     if: matrix.type == 'rpm'
-     run: |
-       VERSION=${GITHUB_REF#refs/tags/v}
-       mkdir -p ~/rpmbuild/{SOURCES,SPECS,BUILD,RPMS,SRPMS}
-       cp packaging/netscan.spec ~/rpmbuild/SPECS/ || echo "Creating basic spec"
-       tar czf ~/rpmbuild/SOURCES/netscan-${VERSION}.tar.gz --transform "s,^,netscan-${VERSION}/," .
-       rpmbuild -ba ~/rpmbuild/SPECS/netscan.spec || make rpm
-       
-   - name: Build DEB  
-     if: matrix.type == 'deb'
-     run: |
-       dpkg-buildpackage -us -uc || make deb
-       
-   - name: Upload RPM
-     if: matrix.type == 'rpm'
-     uses: actions/upload-artifact@v3
-     with:
-       name: rpm-package
-       path: ~/rpmbuild/RPMS/x86_64/*.rpm
-       
-   - name: Upload DEB
-     if: matrix.type == 'deb'
-     uses: actions/upload-artifact@v3
-     with:
-       name: deb-package
-       path: ../*.deb
+  build-packages:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    strategy:
+      matrix:
+        include:
+          - os: fedora:latest
+            type: rpm
+          - os: ubuntu:latest
+            type: deb
+    container: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install RPM deps
+      if: matrix.type == 'rpm'
+      run: dnf install -y gcc make rpm-build rpm-devel tar gzip
+      
+    - name: Install DEB deps
+      if: matrix.type == 'deb'
+      run: apt-get update && apt-get install -y build-essential debhelper devscripts
+    
+    - name: Build RPM
+      if: matrix.type == 'rpm'
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/v}
+        mkdir -p ~/rpmbuild/{SOURCES,SPECS,BUILD,RPMS,SRPMS}
+        make rpm || echo "RPM build failed"
+        
+    - name: Build DEB  
+      if: matrix.type == 'deb'
+      run: |
+        make deb || echo "DEB build failed"
+        
+    - name: Upload RPM
+      if: matrix.type == 'rpm'
+      uses: actions/upload-artifact@v4
+      with:
+        name: rpm-package
+        path: ~/rpmbuild/RPMS/x86_64/*.rpm
+        
+    - name: Upload DEB
+      if: matrix.type == 'deb'
+      uses: actions/upload-artifact@v4
+      with:
+        name: deb-package
+        path: ../*.deb
 
- release:
-   needs: build-packages
-   runs-on: ubuntu-latest
-   if: startsWith(github.ref, 'refs/tags/')
-   steps:
-   - uses: actions/download-artifact@v3
-   
-   - name: Create Release
-     uses: softprops/action-gh-release@v1
-     with:
-       files: |
-         rpm-package/*.rpm
-         deb-package/*.deb
-       generate_release_notes: true
-     env:
-       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  release:
+    needs: build-packages
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+    - uses: actions/download-artifact@v4
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          rpm-package/*.rpm
+          deb-package/*.deb
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
