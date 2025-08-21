@@ -46,7 +46,7 @@ jobs:
     - name: Create packages directory
       run: mkdir -p packages
         
-    - name: Create simple DEB
+    - name: Create DEB package
       run: |
         VERSION=${GITHUB_REF#refs/tags/v}
         mkdir -p netscan_${VERSION}/DEBIAN
@@ -60,12 +60,54 @@ jobs:
         Description: Network port scanner
         EOF
         dpkg-deb --build netscan_${VERSION} packages/
+
+    - name: Create RPM package
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/v}
+        mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+        
+        # Create spec file
+        cat > ~/rpmbuild/SPECS/netscan.spec << EOF
+        Name:           netscan
+        Version:        ${VERSION}
+        Release:        1%{?dist}
+        Summary:        Network port scanner
+        License:        MIT
+        BuildArch:      x86_64
+        
+        %description
+        Simple network port scanner tool
+        
+        %prep
+        
+        %build
+        
+        %install
+        mkdir -p %{buildroot}%{_bindir}
+        cp %{_sourcedir}/netscan %{buildroot}%{_bindir}/
+        
+        %files
+        %{_bindir}/netscan
+        
+        %changelog
+        * $(date +'%a %b %d %Y') User <user@example.com> - ${VERSION}-1
+        - Release ${VERSION}
+        EOF
+        
+        # Copy binary to SOURCES
+        cp netscan ~/rpmbuild/SOURCES/
+        
+        # Build RPM
+        rpmbuild -bb ~/rpmbuild/SPECS/netscan.spec
+        
+        # Copy to packages directory
+        cp ~/rpmbuild/RPMS/x86_64/*.rpm packages/
         
     - name: Upload packages
       uses: actions/upload-artifact@v4
       with:
         name: packages
-        path: packages/*.deb
+        path: packages/*
 
   release:
     needs: build-packages
@@ -79,7 +121,5 @@ jobs:
     - name: Create Release
       uses: softprops/action-gh-release@v2
       with:
-        files: packages/*.deb
+        files: packages/*
         generate_release_notes: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
