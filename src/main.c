@@ -14,7 +14,7 @@
 
 static void usage(char const *prog_name)
 {
-	printf("Usage: %s -h <host> -p <port>\n", prog_name);
+	printf("Usage: %s -h <host> -p <port> -t <timeout(sec)> -j <threads>\n", prog_name);
 }
 
 
@@ -22,12 +22,12 @@ int main(int argc, char *argv[])
 {
 
 	char *HOST = NULL;
-	int *PORTS;
-        int TIMEOUT = -1;
-        int count = 0;
+	int *PORTS = NULL;
+	int TIMEOUT = -1;
+	int THREADS = 1;
+	int count = 0;
 	int opt;
-	
-	while ((opt = getopt(argc, argv, "h:p:t:")) != -1) {
+	while ((opt = getopt(argc, argv, "h:p:t:j:H")) != -1) {
 		switch (opt) {
 		case 'h':
 			HOST = optarg;
@@ -35,9 +35,15 @@ int main(int argc, char *argv[])
 		case 'p':
 			PORTS = parse_port_list(optarg, &count);
 			break;
-                case 't':
-                        TIMEOUT = atoi(optarg);
-                        break;
+		case 't':
+			TIMEOUT = atoi(optarg);
+			break;
+		case 'j':
+			THREADS = atoi(optarg);
+			break;
+		case 'H':
+			usage(argv[0]);
+			return 0;
 		case '?':
 			usage(argv[0]);
 			return 1;
@@ -50,10 +56,36 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	char IP[INET_ADDRSTRLEN];
+	if(resolve_hostname(HOST, IP) != 0){
+		return -1;
+	}
+	
+	printf("HOST: %s (%s)\n", HOST, IP);
+	scan_config_t config = {
+        .host = HOST,
+        .ports = PORTS,
+        .port_count = count,
+        .thread_count = THREADS,  // You can adjust number of threads
+        .timeout = TIMEOUT > 0 ? TIMEOUT : 2  // Default 2 seconds if not specified
+    };
 
-        printf("TARGET: %s\n", HOST);
-        for(int i=0; i < count; i++){
-                scan_port(HOST, PORTS[i], TIMEOUT);
-        }
+	scan_result_t *results = NULL;
+	if(threaded_scan_ports(&config, &results) != 0){
+		fprintf(stderr, "Scan failed \n");
+		free(PORTS);
+		return 1;
+	}
+
+	for(int i = 0; i < config.port_count; i++) {
+        printf("Port %d: %s\n", 
+               results[i].port,
+               results[i].status == PORT_OPEN ? "open" : "closed");
+    }
+
+	free(PORTS);
+	free(results);
+	
+
 	return 0;
 }
