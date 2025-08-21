@@ -14,7 +14,7 @@
 
 static void usage(char const *prog_name)
 {
-	printf("Usage: %s -h <host> -p <port> -t <timeout(sec)> -j <threads>\n", prog_name);
+	printf("Usage: %s -h <host> -p <port> \n\t-t <timeout(sec)> -j <threads> -x (exclude closed ports)\n", prog_name);
 }
 
 
@@ -26,8 +26,9 @@ int main(int argc, char *argv[])
 	int TIMEOUT = -1;
 	int THREADS = 1;
 	int count = 0;
+	int exclude = 0;
 	int opt;
-	while ((opt = getopt(argc, argv, "h:p:t:j:H")) != -1) {
+	while ((opt = getopt(argc, argv, "h:p:t:j:xH")) != -1) {
 		switch (opt) {
 		case 'h':
 			HOST = optarg;
@@ -40,6 +41,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'j':
 			THREADS = atoi(optarg);
+			break;
+		case 'x':
+			exclude = 1;
 			break;
 		case 'H':
 			usage(argv[0]);
@@ -77,11 +81,22 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	for(int i = 0; i < config.port_count; i++) {
-        printf("Port %d: %s\n", 
+	if(exclude){
+		for(int i = 0; i < config.port_count; i++) {
+			if(results[i].status){
+				printf("Port %d: %s\n", 
+					results[i].port,
+					results[i].status == PORT_OPEN ? "open" : "closed");
+			}
+    	}
+	} else {
+		for(int i = 0; i < config.port_count; i++) {
+        	printf("Port %d: %s\n", 
                results[i].port,
                results[i].status == PORT_OPEN ? "open" : "closed");
-    }
+    	}
+	}
+	
 
 	free(PORTS);
 	free(results);

@@ -25,6 +25,7 @@ typedef struct {
 
 typedef struct {
     int current_index;
+    int completed_count;
     pthread_mutex_t mutex;
     scan_config_t *config;
     scan_result_t *results;
@@ -52,6 +53,8 @@ void* worker_thread(void* work_queue);
 int get_next_port(work_queue_t *work_queue, work_item_t *item);
 void save_result(work_queue_t *work_queue, work_item_t *item , int status);
 
+void update_progress(int completed, int total);
+void mark_port_completed(work_queue_t *work_queue);
 
 
 #endif

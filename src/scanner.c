@@ -190,6 +190,7 @@ int threaded_scan_ports(scan_config_t *config, scan_result_t **results) {
     work_queue->config = config;
     work_queue->results = *results;
     work_queue->current_index = 0;
+	work_queue->completed_count = 0;
 
     if(pthread_mutex_init(&work_queue->mutex, NULL) != 0) {
         free(*results);
@@ -234,6 +235,8 @@ void* worker_thread(void *arg){
 		int status = scan_port(work_queue->config->host, item.port, work_queue->config->timeout);
 
 		save_result(work_queue, &item, status);
+
+		mark_port_completed(work_queue);
 	}
 	return NULL;
 }
@@ -259,3 +262,38 @@ void save_result(work_queue_t *work_queue, work_item_t *item, int status){
 	work_queue->results[item->index].status = status;	
 }
 
+pthread_mutex_t progress_mutex = PTHREAD_MUTEX_INITIALIZER;
+void update_progress(int completed, int total){
+	int bar_width = 50;
+	float percentage = (float)completed/total;
+	int filled = (int)(percentage*bar_width);
+	
+	pthread_mutex_lock(&progress_mutex);
+	printf("\rProgress: [");
+	for(int i=0; i<filled;i++){
+		printf("█");
+	}
+	for(int i=filled; i<bar_width; i++){
+		printf("░");
+	}
+
+	printf("] %.1f%% (%d/%d)", percentage*100, completed, total);
+	fflush(stdout);
+
+	if(completed==total){
+		printf("\n");
+	}
+	pthread_mutex_unlock(&progress_mutex);
+}
+
+void mark_port_completed(work_queue_t *work_queue){
+	pthread_mutex_lock(&work_queue->mutex);
+
+	work_queue->completed_count++;
+	int completed = work_queue->completed_count;
+	int total = work_queue->config->port_count;
+
+	pthread_mutex_unlock(&work_queue->mutex);
+
+	update_progress(completed, total);
+}
