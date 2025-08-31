@@ -9,6 +9,7 @@
 #include <sys/select.h>
 #include <netdb.h>
 #include <stdlib.h>
+#include <string.h>
 #include "../include/scanner.h"
 
 
@@ -25,10 +26,12 @@ int main(int argc, char *argv[])
 	int *PORTS = NULL;
 	int TIMEOUT = -1;
 	int THREADS = 1;
+	int SERVICE_DETECTION = 0;
 	int count = 0;
 	int exclude = 0;
+	protocol_t PROTOCOL;
 	int opt;
-	while ((opt = getopt(argc, argv, "h:p:t:j:xH")) != -1) {
+	while ((opt = getopt(argc, argv, "h:p:t:j:s:xH")) != -1) {
 		switch (opt) {
 		case 'h':
 			HOST = optarg;
@@ -42,6 +45,13 @@ int main(int argc, char *argv[])
 		case 'j':
 			THREADS = atoi(optarg);
 			break;
+		case 's':
+			if (strcmp(optarg, "V")==0){
+				SERVICE_DETECTION =1;
+			}
+			if (strcmp(optarg, "U")==0){
+				PROTOCOL = P_UDP;
+			}
 		case 'x':
 			exclude = 1;
 			break;
@@ -70,8 +80,9 @@ int main(int argc, char *argv[])
         .host = HOST,
         .ports = PORTS,
         .port_count = count,
-        .thread_count = THREADS,  // You can adjust number of threads
-        .timeout = TIMEOUT > 0 ? TIMEOUT : 2  // Default 2 seconds if not specified
+        .thread_count = THREADS,
+        .timeout = TIMEOUT > 0 ? TIMEOUT : 2,
+		.service_detection = SERVICE_DETECTION
     };
 
 	scan_result_t *results = NULL;

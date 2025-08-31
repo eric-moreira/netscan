@@ -1,3 +1,4 @@
+#include <bits/types/struct_timeval.h>
 #define _GNU_SOURCE
 #include <stddef.h>
 #include <string.h>
@@ -23,7 +24,7 @@ int scan_port(char *host, int port, int seconds)
 {	
     // Port 0 is reserved and invalid for scanning
     if(port <= 0 || port > 65535){
-        printf("Invalid port \n");
+        fprintf(stderr,"Invalid port \n");
         return -1;
     }
 	int sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -297,3 +298,67 @@ void mark_port_completed(work_queue_t *work_queue){
 
 	update_progress(completed, total);
 }
+
+int scan_udp_port(char *host, int port, int timeout, char *payload, int payload_len){
+	if(port <= 0 || port > 65535){
+		fprintf(stderr, "Invalid port \n");
+		return -1;
+	}
+
+	int sock = socket(AF_INET, SOCK_DGRAM, 0);
+	fcntl(sock, F_SETFL, O_NONBLOCK);
+	struct addrinfo hints, *result;
+
+	memset(&hints, 0, sizeof(hints));
+
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_DGRAM;
+
+	if (getaddrinfo(host, NULL, &hints, &result) != 0) {
+		fprintf(stderr, "getaddrinfo() failed\n");
+		return -1;
+	}
+
+	struct sockaddr_in *addr_in = (struct sockaddr_in *)result->ai_addr;
+
+	addr_in->sin_port = htons(port);
+
+	if(sendto(sock, payload, payload_len, 0, addr_in, sizeof(*addr_in))<0){
+		perror("sendto");
+		freeaddrinfo(result);
+		close(sock);
+		return -1;
+	}
+
+	fd_set read_fds;
+	FD_ZERO(&read_fds);
+	FD_SET(sock, &read_fds);
+
+
+	struct timeval tv;
+	tv.tv_sec = timeout > 0 ? timeout : 3;
+	tv.tv_usec = 0;
+
+	int select_result = select(sock+1, & read_fds, NULL, NULL, &tv);
+
+	int status;
+
+	if(select_result > 0){
+		char buf[1024];
+		ssize_t bytes = recvfrom(sock, buf, sizeof(buf), 0, NULL, NULL);
+		if (bytes > 0){
+			status = UDP_PORT_OPEN;
+		} else {
+			status = UDP_PORT_FILTERED;
+		}
+	} else if(select_result == 0) {
+		status = UDP_PORT_FILTERED;
+	} else {
+		perror("select");
+		status = -1;
+	}
+	
+	freeaddrinfo(result);
+	close(sock);
+	return status;
+}	
