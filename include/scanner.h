@@ -8,6 +8,23 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+enum ports {
+    PORT_CLOSED = 0,
+    PORT_OPEN = 1,
+};
+
+enum udp_ports {
+    UDP_PORT_CLOSED = 0,
+    UDP_PORT_OPEN = 1,
+    UDP_PORT_FILTERED = 2,
+    UDP_PORT_OPEN_FILTERED = 3
+};
+
+typedef enum {
+    P_TCP = 0,
+    P_UDP
+} protocol_t;
+
 
 typedef struct {
     char *host;
@@ -15,6 +32,9 @@ typedef struct {
     int port_count;
     int thread_count;
     int timeout;
+    int service_detection;
+    protocol_t protocol;
+    int udp_payload_size;
 } scan_config_t;
 
 typedef struct {
@@ -25,6 +45,7 @@ typedef struct {
 
 typedef struct {
     int current_index;
+    int completed_count;
     pthread_mutex_t mutex;
     scan_config_t *config;
     scan_result_t *results;
@@ -35,10 +56,6 @@ typedef struct {
     int index;
 } work_item_t;
 
-enum ports {
-    PORT_CLOSED = 0,
-    PORT_OPEN = 1,
-};
 
 int scan_port(char *host, int port, int seconds);
 int* parse_single_port(char* str, int* count);
@@ -52,6 +69,12 @@ void* worker_thread(void* work_queue);
 int get_next_port(work_queue_t *work_queue, work_item_t *item);
 void save_result(work_queue_t *work_queue, work_item_t *item , int status);
 
+void update_progress(int completed, int total);
+void mark_port_completed(work_queue_t *work_queue);
+
+//UDP
+int scan_udp_port(char *host, int port, int timeout, char *payload, int payload_len);
+const char* get_port_status_string(int status, protocol_t protocol);
 
 
 #endif

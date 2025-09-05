@@ -9,12 +9,14 @@
 #include <sys/select.h>
 #include <netdb.h>
 #include <stdlib.h>
+#include <string.h>
 #include "../include/scanner.h"
 
 
 static void usage(char const *prog_name)
 {
-	printf("Usage: %s -h <host> -p <port> -t <timeout(sec)> -j <threads>\n", prog_name);
+	printf("Usage: %s -h <host> -p <port> \n-t <timeout(sec)> \n-j <threads> \
+	\n-sU (UDP scan) \n-x (exclude closed ports)\n", prog_name);
 }
 
 
@@ -25,9 +27,12 @@ int main(int argc, char *argv[])
 	int *PORTS = NULL;
 	int TIMEOUT = -1;
 	int THREADS = 1;
+	int SERVICE_DETECTION = 0;
 	int count = 0;
+	int exclude = 0;
+	protocol_t PROTOCOL = P_TCP;
 	int opt;
-	while ((opt = getopt(argc, argv, "h:p:t:j:H")) != -1) {
+	while ((opt = getopt(argc, argv, "h:p:t:j:s:xH")) != -1) {
 		switch (opt) {
 		case 'h':
 			HOST = optarg;
@@ -40,6 +45,17 @@ int main(int argc, char *argv[])
 			break;
 		case 'j':
 			THREADS = atoi(optarg);
+			break;
+		case 's':
+			if (strcmp(optarg, "V")==0){
+				SERVICE_DETECTION =1;
+			}
+			if (strcmp(optarg, "U")==0){
+				PROTOCOL = P_UDP;
+			}
+			break;
+		case 'x':
+			exclude = 1;
 			break;
 		case 'H':
 			usage(argv[0]);
@@ -66,8 +82,11 @@ int main(int argc, char *argv[])
         .host = HOST,
         .ports = PORTS,
         .port_count = count,
-        .thread_count = THREADS,  // You can adjust number of threads
-        .timeout = TIMEOUT > 0 ? TIMEOUT : 2  // Default 2 seconds if not specified
+        .thread_count = THREADS,
+        .timeout = TIMEOUT > 0 ? TIMEOUT : 2,
+		.service_detection = SERVICE_DETECTION,
+		.protocol = PROTOCOL,
+		.udp_payload_size = 0
     };
 
 	scan_result_t *results = NULL;
@@ -77,11 +96,22 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	for(int i = 0; i < config.port_count; i++) {
-        printf("Port %d: %s\n", 
-               results[i].port,
-               results[i].status == PORT_OPEN ? "open" : "closed");
-    }
+	if(exclude){
+		for(int i = 0; i < config.port_count; i++) {
+			if(results[i].status){
+				printf("Port %d: %s\n",
+					results[i].port,
+					get_port_status_string(results[i].status, PROTOCOL));
+			}
+    	}
+	} else {
+		for(int i = 0; i < config.port_count; i++) {
+        	printf("Port %d: %s\n",
+					results[i].port,
+					get_port_status_string(results[i].status, PROTOCOL));
+    	}
+	}
+	
 
 	free(PORTS);
 	free(results);

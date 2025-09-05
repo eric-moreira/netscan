@@ -23,7 +23,7 @@ int scan_port(char *host, int port, int seconds)
 {	
     // Port 0 is reserved and invalid for scanning
     if(port <= 0 || port > 65535){
-        printf("Invalid port \n");
+        fprintf(stderr,"Invalid port \n");
         return -1;
     }
 	int sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -190,6 +190,7 @@ int threaded_scan_ports(scan_config_t *config, scan_result_t **results) {
     work_queue->config = config;
     work_queue->results = *results;
     work_queue->current_index = 0;
+	work_queue->completed_count = 0;
 
     if(pthread_mutex_init(&work_queue->mutex, NULL) != 0) {
         free(*results);
@@ -231,9 +232,20 @@ void* worker_thread(void *arg){
 		if(get_next_port(work_queue, &item) == -1){
 			break;
 		}
-		int status = scan_port(work_queue->config->host, item.port, work_queue->config->timeout);
-
+		int status;
+		if(work_queue->config->protocol == P_UDP){
+			char default_payload[] = "test";
+			status = scan_udp_port(work_queue->config->host, item.port,
+				 work_queue->config->timeout, default_payload, 
+				 strlen(default_payload));
+		} else {
+			status = scan_port(work_queue->config->host, item.port,
+			 work_queue->config->timeout);
+		}
+		
 		save_result(work_queue, &item, status);
+
+		mark_port_completed(work_queue);
 	}
 	return NULL;
 }
@@ -259,3 +271,115 @@ void save_result(work_queue_t *work_queue, work_item_t *item, int status){
 	work_queue->results[item->index].status = status;	
 }
 
+pthread_mutex_t progress_mutex = PTHREAD_MUTEX_INITIALIZER;
+void update_progress(int completed, int total){
+	int bar_width = 50;
+	float percentage = (float)completed/total;
+	int filled = (int)(percentage*bar_width);
+	
+	pthread_mutex_lock(&progress_mutex);
+	printf("\rProgress: [");
+	for(int i=0; i<filled;i++){
+		printf("█");
+	}
+	for(int i=filled; i<bar_width; i++){
+		printf("░");
+	}
+
+	printf("] %.1f%% (%d/%d)", percentage*100, completed, total);
+	fflush(stdout);
+
+	if(completed==total){
+		printf("\n");
+	}
+	pthread_mutex_unlock(&progress_mutex);
+}
+
+void mark_port_completed(work_queue_t *work_queue){
+	pthread_mutex_lock(&work_queue->mutex);
+
+	work_queue->completed_count++;
+	int completed = work_queue->completed_count;
+	int total = work_queue->config->port_count;
+
+	pthread_mutex_unlock(&work_queue->mutex);
+
+	update_progress(completed, total);
+}
+
+int scan_udp_port(char *host, int port, int timeout, char *payload, int payload_len){
+	if(port <= 0 || port > 65535){
+		fprintf(stderr, "Invalid port \n");
+		return -1;
+	}
+
+	int sock = socket(AF_INET, SOCK_DGRAM, 0);
+	fcntl(sock, F_SETFL, O_NONBLOCK);
+	struct addrinfo hints, *result;
+
+	memset(&hints, 0, sizeof(hints));
+
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_DGRAM;
+
+	if (getaddrinfo(host, NULL, &hints, &result) != 0) {
+		fprintf(stderr, "getaddrinfo() failed\n");
+		return -1;
+	}
+
+	struct sockaddr_in *addr_in = (struct sockaddr_in *)result->ai_addr;
+
+	addr_in->sin_port = htons(port);
+
+	if(sendto(sock, payload, payload_len, 0, addr_in, sizeof(*addr_in))<0){
+		perror("sendto");
+		freeaddrinfo(result);
+		close(sock);
+		return -1;
+	}
+
+	fd_set read_fds;
+	FD_ZERO(&read_fds);
+	FD_SET(sock, &read_fds);
+
+
+	struct timeval tv;
+	tv.tv_sec = timeout > 0 ? timeout : 3;
+	tv.tv_usec = 0;
+
+	int select_result = select(sock+1, & read_fds, NULL, NULL, &tv);
+
+	int status;
+
+	if(select_result > 0){
+		char buf[1024];
+		ssize_t bytes = recvfrom(sock, buf, sizeof(buf), 0, NULL, NULL);
+		if (bytes > 0){
+			status = UDP_PORT_OPEN;
+		} else {
+			status = UDP_PORT_FILTERED;
+		}
+	} else if(select_result == 0) {
+		status = UDP_PORT_FILTERED;
+	} else {
+		perror("select");
+		status = -1;
+	}
+	
+	freeaddrinfo(result);
+	close(sock);
+	return status;
+}
+
+const char* get_port_status_string(int status, protocol_t protocol){
+	if(protocol == P_UDP){
+		switch (status) {
+              case UDP_PORT_OPEN: return "open";
+              case UDP_PORT_FILTERED: return "filtered";
+              case UDP_PORT_CLOSED: return "closed";
+              default: return "unknown";
+          }
+	} else {
+		return status == PORT_OPEN ? "open" : "closed";
+	}
+}
