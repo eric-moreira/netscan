@@ -74,7 +74,7 @@ void mark_port_completed(work_queue_t *work_queue);
 
 //UDP
 int scan_udp_port(char *host, int port, int timeout, char *payload, int payload_len);
-
+const char* get_port_status_string(int status, protocol_t protocol);
 
 
 #endif

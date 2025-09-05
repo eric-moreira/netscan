@@ -15,7 +15,8 @@
 
 static void usage(char const *prog_name)
 {
-	printf("Usage: %s -h <host> -p <port> \n\t-t <timeout(sec)> -j <threads> -x (exclude closed ports)\n", prog_name);
+	printf("Usage: %s -h <host> -p <port> \n-t <timeout(sec)> \n-j <threads> \
+	\n-sU (UDP scan) \n-x (exclude closed ports)\n", prog_name);
 }
 
 
@@ -29,7 +30,7 @@ int main(int argc, char *argv[])
 	int SERVICE_DETECTION = 0;
 	int count = 0;
 	int exclude = 0;
-	protocol_t PROTOCOL;
+	protocol_t PROTOCOL = P_TCP;
 	int opt;
 	while ((opt = getopt(argc, argv, "h:p:t:j:s:xH")) != -1) {
 		switch (opt) {
@@ -52,6 +53,7 @@ int main(int argc, char *argv[])
 			if (strcmp(optarg, "U")==0){
 				PROTOCOL = P_UDP;
 			}
+			break;
 		case 'x':
 			exclude = 1;
 			break;
@@ -82,7 +84,9 @@ int main(int argc, char *argv[])
         .port_count = count,
         .thread_count = THREADS,
         .timeout = TIMEOUT > 0 ? TIMEOUT : 2,
-		.service_detection = SERVICE_DETECTION
+		.service_detection = SERVICE_DETECTION,
+		.protocol = PROTOCOL,
+		.udp_payload_size = 0
     };
 
 	scan_result_t *results = NULL;
@@ -95,16 +99,16 @@ int main(int argc, char *argv[])
 	if(exclude){
 		for(int i = 0; i < config.port_count; i++) {
 			if(results[i].status){
-				printf("Port %d: %s\n", 
+				printf("Port %d: %s\n",
 					results[i].port,
-					results[i].status == PORT_OPEN ? "open" : "closed");
+					get_port_status_string(results[i].status, PROTOCOL));
 			}
     	}
 	} else {
 		for(int i = 0; i < config.port_count; i++) {
-        	printf("Port %d: %s\n", 
-               results[i].port,
-               results[i].status == PORT_OPEN ? "open" : "closed");
+        	printf("Port %d: %s\n",
+					results[i].port,
+					get_port_status_string(results[i].status, PROTOCOL));
     	}
 	}
 	

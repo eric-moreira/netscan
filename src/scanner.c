@@ -1,4 +1,3 @@
-#include <bits/types/struct_timeval.h>
 #define _GNU_SOURCE
 #include <stddef.h>
 #include <string.h>
@@ -233,8 +232,17 @@ void* worker_thread(void *arg){
 		if(get_next_port(work_queue, &item) == -1){
 			break;
 		}
-		int status = scan_port(work_queue->config->host, item.port, work_queue->config->timeout);
-
+		int status;
+		if(work_queue->config->protocol == P_UDP){
+			char default_payload[] = "test";
+			status = scan_udp_port(work_queue->config->host, item.port,
+				 work_queue->config->timeout, default_payload, 
+				 strlen(default_payload));
+		} else {
+			status = scan_port(work_queue->config->host, item.port,
+			 work_queue->config->timeout);
+		}
+		
 		save_result(work_queue, &item, status);
 
 		mark_port_completed(work_queue);
@@ -361,4 +369,17 @@ int scan_udp_port(char *host, int port, int timeout, char *payload, int payload_
 	freeaddrinfo(result);
 	close(sock);
 	return status;
-}	
+}
+
+const char* get_port_status_string(int status, protocol_t protocol){
+	if(protocol == P_UDP){
+		switch (status) {
+              case UDP_PORT_OPEN: return "open";
+              case UDP_PORT_FILTERED: return "filtered";
+              case UDP_PORT_CLOSED: return "closed";
+              default: return "unknown";
+          }
+	} else {
+		return status == PORT_OPEN ? "open" : "closed";
+	}
+}
